@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Редактор счетов EasyPark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#EDF0F4; --surface:#FFFFFF; --ink:#17202D; --muted:#5C6778; --line:#D5DBE3;
+  --accent:#1E54A6; --accent-ink:#FFFFFF; --accent-soft:#E2EAF7;
+  --strike:#8B95A2; --removed-bg:#F4F6F8; --warn-bg:#FBF1DC; --warn-ink:#6B4A0E;
+  --plate-bg:#FFFFFF; --plate-ink:#111418; --plate-edge:#20252C; --eu:#1E54A6;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151C; --surface:#19212C; --ink:#E5EAF0; --muted:#95A1B0; --line:#2B3542;
+    --accent:#7EA5EA; --accent-ink:#0D1726; --accent-soft:#1E2B40;
+    --strike:#6E7987; --removed-bg:#151B23; --warn-bg:#3A2E15; --warn-ink:#F1D9A6;
+    --plate-bg:#E8EBEF; --plate-ink:#111418; --plate-edge:#C9CED5; --eu:#2D5FB0;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151C; --surface:#19212C; --ink:#E5EAF0; --muted:#95A1B0; --line:#2B3542;
+  --accent:#7EA5EA; --accent-ink:#0D1726; --accent-soft:#1E2B40;
+  --strike:#6E7987; --removed-bg:#151B23; --warn-bg:#3A2E15; --warn-ink:#F1D9A6;
+  --plate-bg:#E8EBEF; --plate-ink:#111418; --plate-edge:#C9CED5; --eu:#2D5FB0;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:16px; line-height:1.45;
+}
+body.has-bar{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+[hidden]{display:none !important}
+main{max-width:680px;margin:0 auto;padding:22px 16px 24px}
+.num{font-variant-numeric:tabular-nums}
+h1{font-size:1.7rem;line-height:1.15;font-weight:700;letter-spacing:-0.015em;margin:0 0 14px}
+h2{font-size:1.15rem;font-weight:650;margin:0}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* empty state */
+.lead{font-size:1.05rem;margin:0 0 20px;max-width:34em}
+.drop{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;
+  min-height:190px;padding:24px 16px;border:2px dashed var(--line);border-radius:16px;background:var(--surface);
+  cursor:pointer;transition:border-color .15s ease, background-color .15s ease;
+}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop:focus-within{border-color:var(--accent)}
+.drop .p-sign{
+  width:52px;height:52px;border-radius:10px;background:var(--eu);color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:32px;line-height:1;border:3px solid var(--surface);box-shadow:0 0 0 2px var(--eu)
+}
+.drop .hint{color:var(--muted);font-size:.92rem}
+@media (hover:none){ .drop .hint{display:none} }
+.msg{margin:14px 2px 0;font-size:.95rem}
+.msg:empty{display:none}
+.msg.err{color:var(--warn-ink);background:var(--warn-bg);padding:10px 12px;border-radius:10px}
+.note{margin:12px 0 0;font-size:.85rem;color:var(--muted)}
+
+/* buttons */
+.primary{
+  appearance:none;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);
+  font:inherit;font-weight:650;padding:0 20px;min-height:48px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;
+}
+.primary:disabled{opacity:.45;cursor:not-allowed}
+.ghost{
+  appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;
+  font:inherit;font-size:.92rem;font-weight:550;padding:0 14px;min-height:40px;cursor:pointer
+}
+.ghost:hover{border-color:var(--accent)}
+.linkbtn{appearance:none;border:0;background:none;color:var(--accent);font:inherit;font-weight:600;padding:6px 0;cursor:pointer;min-height:36px}
+button:focus-visible,.drop input:focus-visible ~ .primary{outline:2.5px solid var(--accent);outline-offset:2px}
+.file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* editor */
+.toolbar{display:flex;gap:8px;justify-content:flex-end;margin:-6px 0 14px}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin:0 0 20px;font-size:.92rem}
+.meta dt{color:var(--muted)}
+.meta dd{margin:0;overflow-wrap:anywhere}
+.warn{background:var(--warn-bg);color:var(--warn-ink);border-radius:12px;padding:12px 14px;margin:0 0 20px;font-size:.9rem}
+.warn ul{margin:6px 0 0;padding-left:18px}
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px 12px;margin-bottom:28px}
+.srow{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+.srow span:first-child{color:var(--muted)}
+.srow.total{border-top:1px solid var(--line);margin-top:8px;padding-top:10px;font-weight:700;font-size:1.15rem}
+.srow.total span:first-child{color:var(--ink)}
+.changes{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:10px;padding:9px 12px;border-radius:10px;background:var(--accent-soft);font-size:.9rem}
+.grouphead{font-size:.95rem;font-weight:600;color:var(--muted);margin:4px 2px 12px;overflow-wrap:anywhere}
+.sechead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 2px 10px}
+.count{color:var(--muted);font-size:.9rem;white-space:nowrap}
+.list{list-style:none;margin:0 0 28px;padding:0;display:flex;flex-direction:column;gap:8px}
+.item{
+  display:grid;grid-template-columns:1.9rem 1fr auto;gap:0 10px;align-items:start;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 8px 12px 8px;
+  transition:background-color .16s ease, border-color .16s ease;
+}
+.pos{color:var(--muted);font-weight:600;font-size:.9rem;text-align:right;padding-top:2px}
+.body{min-width:0}
+.top{display:flex;align-items:baseline;gap:8px}
+.date{font-weight:650;overflow-wrap:anywhere}
+.wd{color:var(--muted);font-size:.9rem}
+.amt{margin-left:auto;font-weight:700;white-space:nowrap;padding-left:6px}
+.line2{color:var(--muted);font-size:.92rem}
+.place{font-size:.95rem;overflow-wrap:anywhere}
+.ids{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:6px}
+.tid{color:var(--muted);font-size:.8rem;overflow-wrap:anywhere}
+.plate{
+  display:inline-flex;align-items:stretch;border:1.5px solid var(--plate-edge);border-radius:4px;overflow:hidden;
+  background:var(--plate-bg);color:var(--plate-ink);font-weight:700;font-size:.82rem;letter-spacing:.06em;line-height:1;
+}
+.plate .eu{background:var(--eu);color:#fff;font-size:.6rem;font-weight:600;letter-spacing:0;padding:4px 3px 2px;display:flex;align-items:flex-end}
+.plate .pn{padding:4px 7px 3px}
+.act{
+  appearance:none;min-width:44px;min-height:44px;margin:-6px 0;border-radius:10px;
+  border:1px solid transparent;background:transparent;color:var(--muted);
+  font:inherit;font-size:1.05rem;cursor:pointer;padding:0 10px;
+}
+.act:hover{background:var(--removed-bg);color:var(--ink)}
+.item.removed{background:var(--removed-bg);border-style:dashed}
+.item.removed .pos, .item.removed .body, .item.removed .body *{color:var(--strike)}
+.item.removed .top, .item.removed .line2, .item.removed .place, .item.removed .tid{text-decoration:line-through;text-decoration-thickness:1.5px}
+.item.removed .plate{opacity:.55}
+.item.removed .act{color:var(--accent);border-color:var(--accent);font-size:.92rem;font-weight:600}
+.item.removed .act:hover{background:var(--accent-soft)}
+
+.bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+}
+.bar-in{max-width:680px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.bar-total{display:flex;flex-direction:column;line-height:1.15;margin-right:auto}
+.bar-total .lbl{color:var(--muted);font-size:.85rem}
+.bar-total .val{font-size:1.45rem;font-weight:700}
+.status{max-width:680px;margin:6px auto 0;font-size:.85rem;color:var(--muted)}
+.status:empty{display:none}
+@media (prefers-reduced-motion: reduce){.item,.drop{transition:none}}
+@media (min-width:560px){ h1{font-size:2rem} main{padding-top:32px} }
+</style>
+</head>
+<body>
+<main>
+  <section id="empty">
+    <h1>Редактор счетов EasyPark</h1>
+    <p class="lead">Загрузите PDF-счёт EasyPark. Записи можно будет убирать и возвращать, итоги пересчитаются, а PDF скачается только с оставшимися записями.</p>
+    <label class="drop" id="drop">
+      <input class="file-input" type="file" id="file" accept="application/pdf,.pdf">
+      <span class="p-sign" aria-hidden="true">P</span>
+      <span class="primary">Выбрать PDF</span>
+      <span class="hint">или перетащите файл сюда</span>
+    </label>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+    <p class="note">Файл разбирается прямо в браузере и никуда не отправляется. Последний счёт и выбор записей хранятся только на этом устройстве.</p>
+  </section>
+
+  <section id="editor" hidden>
+    <div class="toolbar">
+      <button type="button" class="ghost" id="another">Другой счёт</button>
+      <button type="button" class="ghost" id="closeInv">Закрыть счёт</button>
+    </div>
+    <h1 id="title"></h1>
+    <dl class="meta" id="meta"></dl>
+    <div class="warn" id="warn" hidden></div>
+    <section class="summary" aria-label="Итоги">
+      <div id="srows"></div>
+      <div class="changes" id="changes" hidden>
+        <span id="changesText"></span>
+        <button type="button" class="linkbtn" id="restoreAll">Вернуть все</button>
+      </div>
+      <p class="note">Выбор сохраняется на этом устройстве. PDF собирается на немецком, только из оставшихся записей.</p>
+    </section>
+    <div id="lists"></div>
+  </section>
+</main>
+
+<div class="bar" id="bar" role="region" aria-label="Итог и скачивание" hidden>
+  <div class="bar-in">
+    <div class="bar-total"><span class="lbl">Итого к оплате</span><span class="val num" id="bTotal"></span></div>
+    <button type="button" class="primary" id="dl">Скачать PDF</button>
+  </div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+// ===== EasyPark invoice core: parse (from positioned text), totals, PDF build =====
+var EP = (function () {
+  var MONEY_RE = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;
+  var LABEL_RE = /^([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß .\-()\/]{0,40}):\s*(.*)$/;
+
+  function cents(s) { var neg = /^-/.test(s); var v = s.replace(/^-/, "").replace(/\./g, "").split(","); return (neg ? -1 : 1) * (parseInt(v[0], 10) * 100 + parseInt(v[1], 10)); }
+  function eur(c) {
+    var neg = c < 0; c = Math.abs(Math.round(c));
+    var s = Math.floor(c / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return (neg ? "-" : "") + s + "," + String(c % 100).padStart(2, "0");
+  }
+  function joinItems(items) {
+    var out = "", prev = null;
+    items.forEach(function (it) {
+      var s = it.s.replace(/\s+/g, " ").trim(); if (!s) return;
+      if (prev) {
+        var gap = it.x - (prev.x + prev.w);
+        if (gap > 0.6 || /\s$/.test(prev.s) || /^\s/.test(it.s)) out += " ";
+      }
+      out += s; prev = it;
+    });
+    return out.trim();
+  }
+  function rowsOf(items) {
+    var sorted = items.filter(function (it) { return it.s.trim(); }).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+    var rows = [];
+    sorted.forEach(function (it) {
+      var r = rows[rows.length - 1];
+      if (r && it.y - r.y <= 3) r.items.push(it); else rows.push({ y: it.y, items: [it] });
+    });
+    rows.forEach(function (r) { r.items.sort(function (a, b) { return a.x - b.x; }); });
+    return rows;
+  }
+  function mergeLines(lines, hard) {
+    var out = [];
+    lines.forEach(function (l) {
+      if (!l) return;
+      if (!out.length || LABEL_RE.test(l)) { out.push(l); return; }
+      var last = out[out.length - 1];
+      out[out.length - 1] = last + (/[-\/]$/.test(last) ? "" : " ") + l;
+    });
+    return out;
+  }
+  function toFields(lines) {
+    return mergeLines(lines).map(function (l) {
+      var m = l.match(LABEL_RE);
+      return m ? [m[1] + ":", m[2]] : ["", l];
+    });
+  }
+  function rateOf(s) { var m = String(s).match(/(\d+(?:[,.]\d+)?)\s*%/); return m ? Math.round(parseFloat(m[1].replace(",", ".")) * 100) / 100 : null; }
+
+  // pages: [{W,H,items:[{s,x,y,w,size,font}]}]  (y = baseline from top, pt)
+  function parse(pages) {
+    var warnings = [];
+    var all = [];
+    pages.forEach(function (p) { all = all.concat(p.items); });
+    function findItem(re) { for (var i = 0; i < all.length; i++) if (re.test(all[i].s.trim())) return all[i]; return null; }
+    var boldRef = findItem(/^Datum:?$/) || findItem(/^Belegverweis:?$/) || findItem(/^Transaktionen$/);
+    var BOLD = boldRef ? boldRef.font : null;
+    function isBold(it) { return !!BOLD && it.font === BOLD; }
+
+    var footer = { items: [], pageNumY: null };
+    var rows = [];
+    pages.forEach(function (p, pi) {
+      var adr = p.items.filter(function (it) { return it.s.trim() === "Adresse"; }).sort(function (a, b) { return a.y - b.y; })[0];
+      var fTop = adr ? adr.y - 8 : p.H - 45;
+      var body = [], foot = [];
+      p.items.forEach(function (it) {
+        if (/Logo nicht enthalten/.test(it.s)) return;
+        (it.y >= fTop ? foot : body).push(it);
+      });
+      if (pi === 0) {
+        foot.forEach(function (it) {
+          var s = it.s.trim(); if (!s) return;
+          if (/^\d+$/.test(s) && Math.abs(it.x + it.w / 2 - p.W / 2) < 40) { footer.pageNumY = it.y; return; }
+          footer.items.push({ s: s, x: it.x, y: it.y, size: it.size, bold: isBold(it) });
+        });
+      }
+      rowsOf(body).forEach(function (r) { r.p = pi; r.text = joinItems(r.items); rows.push(r); });
+    });
+
+    var ti = -1;
+    for (var i = 0; i < rows.length; i++) if (rows[i].text === "Transaktionen") { ti = i; break; }
+    if (ti < 0) throw new Error("NOT_EASYPARK");
+    var W = pages[0].W;
+
+    // ---- header ----
+    var head = rows.slice(0, ti).filter(function (r) { return r.p === 0; });
+    var titleRow = null;
+    head.forEach(function (r) { if (!titleRow && r.items.some(function (it) { return /Rechnung/.test(it.s) && it.x < W * 0.6; })) titleRow = r; });
+    var title = titleRow ? titleRow.items.filter(function (it) { return it.x < W * 0.6; }).map(function (it) { return { s: it.s.trim(), bold: isBold(it) }; })
+                         : [{ s: "EasyPark |", bold: true }, { s: "Rechnung", bold: false }];
+    var datum = "", datumLabel = "Datum:";
+    head.forEach(function (r) {
+      var m = r.text.match(/(Datum:?)\s*(\d{2}\.\d{2}\.\d{4})/);
+      if (m && !datum) { datum = m[2]; datumLabel = m[1]; }
+    });
+    var after = titleRow ? head.filter(function (r) { return r.y > titleRow.y + 2; }) : head;
+    var meta = [], metaX = null;
+    after.forEach(function (r) {
+      for (var k = 0; k < r.items.length; k++) {
+        var it = r.items[k], s = it.s.trim();
+        if (it.x > W * 0.35 && /:$/.test(s) && !/^Datum/.test(s)) {
+          var vals = r.items.filter(function (v) { return v.x > it.x + it.w + 1; });
+          meta.push({ label: s, value: joinItems(vals), bold: vals.some(isBold) });
+          metaX = metaX == null ? it.x : Math.min(metaX, it.x);
+          break;
+        }
+      }
+    });
+    var address = [];
+    after.forEach(function (r) {
+      if (/Datum:?\s*\d/.test(r.text) && r.items.every(function (it) { return it.x > W * 0.5; })) return;
+      var left = r.items.filter(function (it) { return it.x < (metaX == null ? W * 0.45 : metaX - 8) && !/^Datum/.test(it.s.trim()); });
+      var t = joinItems(left); if (t) address.push(t);
+    });
+    function metaVal(re) { for (var k = 0; k < meta.length; k++) if (re.test(meta[k].label)) return meta[k].value; return ""; }
+
+    // ---- transactions ----
+    var groups = [], g = null, sec = null, cols = null, entry = null, lastHeader = null;
+    var expectGroup = true, mode = "tx";
+    var summary = { lines: [], payLabel: "", payCents: null, hasLogo: false };
+    function newGroup(label) { g = { label: label, sections: [], totalLabel: "", fileTotal: null }; groups.push(g); sec = null; }
+    function newSection(t, sub) { if (!g) newGroup(""); sec = { title: t, subtitle: sub, cols: null, entries: [], sumLabel: "", note: "" }; g.sections.push(sec); }
+    function amountsOf(items) {
+      var txt = joinItems(items); var mm = txt.match(MONEY_RE) || [];
+      var pm = txt.match(/(\d+(?:,\d+)?)\s*%/);
+      return { money: mm.map(cents), pctLabel: pm ? pm[0] : "", pct: pm ? rateOf(pm[0]) : 0 };
+    }
+    function labelPart(r) { return joinItems(r.items.filter(function (it) { return !/^-?[\d.]+,\d{2}(\s*EUR)?$/.test(it.s.trim()) && !/^EUR$/.test(it.s.trim()); })); }
+
+    for (var j = ti + 1; j < rows.length; j++) {
+      var r = rows[j], text = r.text, first = r.items[0];
+      if (text === "Zusammenfassung") { mode = "sum"; entry = null; continue; }
+      if (mode === "sum") {
+        var mny = text.match(MONEY_RE);
+        if (!mny) continue;
+        var lab = labelPart(r);
+        var c = cents(mny[mny.length - 1]);
+        if (/^Total,|payment|Zahlung/i.test(lab)) { summary.payLabel = lab; summary.payCents = c; summary.hasLogo = /\bvia$|\bper$|\bmit$/i.test(lab); }
+        else {
+          var kind = /nicht\s*MwSt/i.test(lab) ? "nonvat" : /MwSt\.?-?\s*pflichtig/i.test(lab) ? "vatnet" : /MwSt/i.test(lab) && rateOf(lab) != null ? "vat" : "other";
+          summary.lines.push({ label: lab, kind: kind, rate: kind === "vat" ? rateOf(lab) : null, fileCents: c });
+        }
+        continue;
+      }
+      if (r.items.some(function (it) { return /^Betrag/.test(it.s.trim()); })) {
+        var bx = r.items.filter(function (it) { return /^Betrag/.test(it.s.trim()); })[0].x;
+        var leftHeads = r.items.filter(function (it) { return it.x < bx - 5; });
+        cols = { det: leftHeads[0] ? leftHeads[0].x : 0, zone: leftHeads[1] ? leftHeads[1].x : bx - 150, amt: bx - 12 };
+        if (sec && !sec.cols && leftHeads.length) sec.cols = [leftHeads[0].s.trim(), leftHeads[1] ? leftHeads[1].s.trim() : ""];
+        lastHeader = r; entry = null; continue;
+      }
+      if (cols && lastHeader && r.p === lastHeader.p && r.y - lastHeader.y < 22 &&
+          r.items.every(function (it) { return it.x >= cols.amt - 8; }) && !MONEY_RE.test(text)) { MONEY_RE.lastIndex = 0; continue; }
+      MONEY_RE.lastIndex = 0;
+      if (/^Summe\b/.test(text)) {
+        if (sec) { sec.sumLabel = labelPart(r); var am = amountsOf(r.items); sec.fileSum = am.money[am.money.length - 1]; }
+        entry = null; continue;
+      }
+      if (/^Total\b/.test(text)) {
+        if (g) { g.totalLabel = labelPart(r); var at = amountsOf(r.items); g.fileTotal = at.money[at.money.length - 1]; }
+        entry = null; sec = null; expectGroup = true; continue;
+      }
+      var hasMoney = (text.match(MONEY_RE) || []).length > 0;
+      if (cols && /^\d+\.$/.test(first.s.trim()) && first.x < cols.det - 1) {
+        if (!sec) newSection("", "");
+        entry = { num: parseInt(first.s, 10), det: [], zone: [], amt: [] };
+        sec.entries.push(entry);
+        distribute(r, 1); continue;
+      }
+      if (entry && cols && first.x >= cols.det - 2) { distribute(r, 0); continue; }
+      if (expectGroup && !hasMoney) { newGroup(text); expectGroup = false; continue; }
+      if (!hasMoney && isBold(first)) {
+        var tItems = [], rest = [];
+        r.items.forEach(function (it) { (rest.length === 0 && isBold(it) ? tItems : rest).push(it); });
+        newSection(joinItems(tItems), joinItems(rest)); entry = null; continue;
+      }
+      if (!hasMoney && sec) { sec.note = sec.note ? sec.note + " " + text : text; continue; }
+      if (!hasMoney && g && !sec) { continue; }
+      warnings.push("Строка не распознана: " + text);
+    }
+    function distribute(row, skip) {
+      var d = [], z = [], a = [];
+      row.items.forEach(function (it, idx) {
+        if (idx < skip) return;
+        if (it.x < cols.det - 1) return;
+        if (it.x < cols.zone - 1) d.push(it); else if (it.x < cols.amt) z.push(it); else a.push(it);
+      });
+      var dt = joinItems(d), zt = joinItems(z);
+      if (dt) entry.det.push(dt);
+      if (zt) entry.zone.push(zt);
+      entry.amt = entry.amt.concat(a);
+    }
+
+    // ---- post-process entries ----
+    var seen = {}, count = 0;
+    groups.forEach(function (gr, gi) {
+      gr.sections.forEach(function (s, si) {
+        s.entries = s.entries.map(function (e, ei) {
+          var fields = toFields(e.det);
+          var zone = mergeLines(e.zone);
+          var am = amountsOf(e.amt);
+          var net, vat, gross;
+          if (am.money.length >= 3) { net = am.money[0]; vat = am.money[1]; gross = am.money[2]; }
+          else if (am.money.length === 1) { net = gross = am.money[0]; vat = 0; warnings.push("Неполные суммы у записи " + e.num); }
+          else { net = vat = gross = 0; warnings.push("Нет сумм у записи " + e.num); }
+          var idf = fields.filter(function (f) { return /Transaktions-ID/i.test(f[0]); })[0];
+          var key = idf ? idf[1] : "g" + gi + "s" + si + "e" + ei;
+          if (seen[key]) key = key + "#" + (++seen[key]); else seen[key] = 1;
+          count++;
+          var get = function (re) { var f = fields.filter(function (x) { return re.test(x[0]); })[0]; return f ? f[1] : ""; };
+          return { key: key, num: e.num, fields: fields, zone: zone, net: net, vat: vat, gross: gross,
+                   pct: am.pct || 0, pctLabel: am.pctLabel || "0 %",
+                   start: get(/^Startzeit/), end: get(/^Endzeit/), plate: get(/^Nummernschild/), tid: idf ? idf[1] : "" };
+        });
+      });
+    });
+    if (!count) throw new Error("NO_ENTRIES");
+
+    var inv = {
+      title: title, datum: datum, datumLabel: datumLabel, address: address, meta: meta,
+      beleg: metaVal(/^Belegverweis/), zeitraum: metaVal(/^Zeitraum/), kunde: metaVal(/^Kundennummer/),
+      groups: groups, summary: summary, footer: footer, warnings: warnings
+    };
+    // ---- sanity checks against the file's own totals ----
+    var t = totals(inv, new Set());
+    groups.forEach(function (gr, gi) {
+      if (gr.fileTotal != null && gr.fileTotal !== t.groups[gi].gross)
+        warnings.push("Итог группы «" + gr.label + "» в файле " + eur(gr.fileTotal) + ", по записям " + eur(t.groups[gi].gross));
+    });
+    if (summary.payCents != null && summary.payCents !== t.gross)
+      warnings.push("Итог в файле " + eur(summary.payCents) + ", по записям " + eur(t.gross));
+    return inv;
+  }
+
+  function totals(inv, removed) {
+    var T = { groups: [], net: 0, vat: 0, gross: 0, nonVatNet: 0, vatNet: 0, byRate: {}, count: 0, active: 0 };
+    inv.groups.forEach(function (g) {
+      var gt = { net: 0, vat: 0, gross: 0, sections: [], active: 0 };
+      g.sections.forEach(function (s) {
+        var st = { net: 0, vat: 0, gross: 0, active: [] };
+        s.entries.forEach(function (e) {
+          T.count++;
+          if (removed.has(e.key)) return;
+          T.active++; st.active.push(e);
+          st.net += e.net; st.vat += e.vat; st.gross += e.gross;
+          if (e.pct > 0 || e.vat) { T.vatNet += e.net; T.byRate[e.pct] = (T.byRate[e.pct] || 0) + e.vat; }
+          else T.nonVatNet += e.net;
+        });
+        gt.sections.push(st); gt.net += st.net; gt.vat += st.vat; gt.gross += st.gross; gt.active += st.active.length;
+      });
+      T.groups.push(gt); T.net += gt.net; T.vat += gt.vat; T.gross += gt.gross;
+    });
+    return T;
+  }
+
+  function summaryLines(inv, T) {
+    var src = inv.summary && inv.summary.lines.length ? inv.summary.lines : [
+      { label: "Total (nicht MwSt.-pflichtig)", kind: "nonvat" }, { label: "Total (MwSt.-pflichtig)", kind: "vatnet" }];
+    var out = [], rates = {};
+    src.forEach(function (l) {
+      if (l.kind === "nonvat") out.push({ label: l.label, cents: T.nonVatNet });
+      else if (l.kind === "vatnet") out.push({ label: l.label, cents: T.vatNet });
+      else if (l.kind === "vat") { rates[l.rate] = 1; out.push({ label: l.label, cents: T.byRate[l.rate] || 0 }); }
+      else out.push({ label: l.label, cents: l.fileCents || 0, fixed: true });
+    });
+    Object.keys(T.byRate).forEach(function (r) {
+      if (!rates[r] && T.byRate[r]) out.push({ label: "MwSt. DE (" + Number(r).toFixed(2).replace(".", ",") + "%)", cents: T.byRate[r] });
+    });
+    return out;
+  }
+
+  var WINANSI = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+  function pdfSafe(s) {
+    return String(s).split("").map(function (ch) {
+      var c = ch.charCodeAt(0);
+      if (c < 256 || WINANSI.indexOf(ch) >= 0) return ch;
+      var d = ch.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return d.charCodeAt(0) < 256 ? d : "?";
+    }).join("");
+  }
+
+  function buildPdf(JsPDF, inv, removed) {
+    var T = totals(inv, removed);
+    var doc = new JsPDF({ unit: "mm", format: "a4", compress: true });
+    var F = "helvetica", L = 15, R = 196, LH = 2.95, PT = 25.4 / 72;
+    var C = { num: 29, det: 30.5, zone: 78, net: 147, pct: 156.5, vat: 176, gross: 193 };
+    var fItems = (inv.footer && inv.footer.items) || [];
+    var FLINE = fItems.length ? Math.min.apply(null, fItems.map(function (i) { return i.y; })) * PT - 2.2 : 278;
+    var PNY = inv.footer && inv.footer.pageNumY ? inv.footer.pageNumY * PT : Math.min(294, FLINE + 15);
+    var MAXY = FLINE - 5, LIMIT = FLINE - 2;
+    var y = 0, boxTop = 0, page = 1;
+
+    function font(style, size, gray) { doc.setFont(F, style); doc.setFontSize(size); doc.setTextColor(gray == null ? 20 : gray); }
+    function txt(s, x, yy, align) { doc.text(pdfSafe(s), x, yy, align ? { align: align } : undefined); }
+    function lw(s) { return doc.getTextWidth(pdfSafe(s)); }
+    function logoSlot() {
+      doc.setLineDashPattern([1.2, 1], 0); doc.setDrawColor(150); doc.setLineWidth(0.25);
+      doc.rect(L, 5, R - L, 11);
+      doc.setLineDashPattern([], 0); doc.setLineWidth(0.2);
+      font("normal", 8, 120); txt("EasyPark-Logo nicht enthalten", (L + R) / 2, 11.6, "center");
+    }
+    function footer() {
+      if (fItems.length) {
+        doc.setDrawColor(215); doc.setLineWidth(0.2); doc.line(L, FLINE, R, FLINE);
+        fItems.forEach(function (it) {
+          font(it.bold ? "bold" : "normal", it.size || 6, it.bold ? 110 : 125);
+          txt(it.s, it.x * PT, it.y * PT);
+        });
+      }
+      font("normal", 6, 125); txt(String(page), 105, PNY, "center");
+    }
+    function addPage() { footer(); doc.addPage(); page++; logoSlot(); y = 26; }
+    function band(label, yy) {
+      doc.setFillColor(222); doc.rect(L, yy, R - L, 7, "F");
+      doc.setFillColor(178); doc.rect(L, yy, 1.8, 7, "F");
+      font("bold", 9.5, 20); txt(label, L + 8, yy + 4.8);
+    }
+    function boxSides(bottom) { doc.setDrawColor(215); doc.setLineWidth(0.2); doc.line(L, boxTop, L, bottom); doc.line(R, boxTop, R, bottom); }
+    function newPage(header) {
+      boxSides(y); addPage(); boxTop = y;
+      doc.setDrawColor(215); doc.line(L, y, R, y); y += 5;
+      if (header) header();
+    }
+    function colHeads(first, second) {
+      font("bold", 7.2, 20);
+      txt(first, C.det, y); txt(second, C.zone, y);
+      txt("Betrag (exkl.", C.net, y, "right"); txt("MwSt.)", C.net, y + 2.9, "right");
+      txt("MwSt.", C.pct, y, "center"); txt("%", C.pct, y + 2.9, "center");
+      txt("MwSt.", C.vat, y, "right");
+      txt("Betrag in", C.gross, y, "right"); txt("EUR (inkl.", C.gross, y + 2.9, "right"); txt("MwSt.)", C.gross, y + 5.8, "right");
+      y += 9.5;
+    }
+    function lvLines(label, value, maxW) {
+      if (!label) { font("normal", 7.2); return doc.splitTextToSize(pdfSafe(value), maxW).map(function (s) { return ["", s]; }); }
+      font("bold", 7.2); var lwid = lw(label + " ");
+      font("normal", 7.2);
+      if (lwid + lw(value) <= maxW) return [[label, value]];
+      for (var i = value.length - 1; i > 0; i--) {
+        if (value[i] === "-" && lwid + lw(value.slice(0, i + 1)) <= maxW) return [[label, value.slice(0, i + 1)], ["", value.slice(i + 1)]];
+      }
+      return [[label, value]];
+    }
+    function drawLv(lines, x, yy) {
+      lines.forEach(function (ln, i) {
+        var yl = yy + i * LH;
+        if (ln[0]) { font("bold", 7.2, 20); txt(ln[0], x, yl); var w = lw(ln[0] + " "); font("normal", 7.2, 20); txt(ln[1], x + w, yl); }
+        else { font("normal", 7.2, 20); txt(ln[1], x, yl); }
+      });
+    }
+    function amounts(e, yy) {
+      font("normal", 6.8, 20);
+      txt(eur(e.net) + " EUR", C.net, yy, "right"); txt(e.pctLabel, C.pct, yy, "center"); txt(eur(e.vat) + " EUR", C.vat, yy, "right");
+      font("normal", 7.6, 20); txt(eur(e.gross), C.gross, yy, "right");
+    }
+    function sumLine(label, net, vat, gross, yy) {
+      font("bold", 7.4, 130); txt(label, L + 3, yy);
+      txt(eur(net) + " EUR", C.net, yy, "right"); txt(eur(vat) + " EUR", C.vat, yy, "right"); txt(eur(gross), C.gross, yy, "right");
+    }
+    function wrapZone(lines) { font("normal", 7.2); var out = []; lines.forEach(function (s) { out = out.concat(doc.splitTextToSize(pdfSafe(s), 50)); }); return out; }
+    function entryLayout(e) {
+      var det = []; e.fields.forEach(function (f) { det = det.concat(lvLines(f[0], f[1], 46)); });
+      var zone = wrapZone(e.zone);
+      return { det: det, zone: zone, h: Math.max(det.length, zone.length, 1) * LH + 1.8 };
+    }
+    function colsFor(s) {
+      if (s.cols) return s.cols;
+      return s.entries.some(function (e) { return e.start; }) ? ["Details zum Parkvorgang", "Parkzone"] : ["Grund der Rechnungsstellung", "Spezifikation"];
+    }
+
+    // ---- header ----
+    logoSlot();
+    var x = L + 1;
+    inv.title.forEach(function (t) { font(t.bold ? "bold" : "normal", 15, 20); txt(t.s, x, 30); x += lw(t.s + " "); });
+    if (inv.datum) {
+      font("normal", 8.5, 20); var dvw = lw(inv.datum); txt(inv.datum, R - 3, 28, "right");
+      font("bold", 8.5, 20); txt(inv.datumLabel, R - 3 - dvw - lw(inv.datumLabel + " "), 28);
+    }
+    font("normal", 8.5, 20);
+    inv.address.forEach(function (a, i) { txt(a, L + 1, 40 + i * 3.6); });
+    inv.meta.forEach(function (m, i) {
+      var yy = 40 + i * 3.9;
+      font("bold", 8.5, 20); txt(m.label, 103, yy);
+      font(m.bold ? "bold" : "normal", 8.5, 20); txt(m.value, R, yy, "right");
+    });
+    var bandY = Math.max(40 + (inv.address.length - 1) * 3.6, 40 + (inv.meta.length - 1) * 3.9) + 8.2;
+    band("Transaktionen", bandY);
+    y = bandY + 11;
+
+    var n = 0, firstGroup = true;
+    inv.groups.forEach(function (g, gi) {
+      var gt = T.groups[gi]; if (!gt.active) return;
+      if (!firstGroup) { y += 6; if (y + 40 > MAXY) addPage(); }
+      firstGroup = false;
+      boxTop = y;
+      doc.setDrawColor(215); doc.setLineWidth(0.2); doc.line(L, y, R, y);
+      if (g.label) {
+        doc.setFillColor(246); doc.rect(L, y, R - L, 6, "F"); doc.line(L, y + 6, R, y + 6);
+        font("bold", 7.2, 20); txt(g.label, L + 3, y + 4.1); y += 11;
+      } else y += 5;
+      var activeSecs = g.sections.map(function (s, si) { return si; }).filter(function (si) { return gt.sections[si].active.length; });
+      activeSecs.forEach(function (si, k) {
+        var s = g.sections[si], st = gt.sections[si], isLast = k === activeSecs.length - 1;
+        var heads = colsFor(s);
+        var headFn = function () { colHeads(heads[0], heads[1]); };
+        var lay0 = entryLayout(st.active[0]);
+        var need = 15 + lay0.h;
+        if (isLast && st.active.length === 1) { if (y + need + 13 + (s.note ? 6 : 0) > LIMIT) newPage(); }
+        else if (y + need > MAXY) newPage();
+        if (s.title) {
+          font("bold", 7.4, 20); txt(s.title, L + 3, y);
+          if (s.subtitle) { var tw = lw(s.title + "  "); font("normal", 7.2, 20); txt(s.subtitle, L + 3 + tw, y); }
+          y += 5.5;
+        }
+        headFn();
+        st.active.forEach(function (e) {
+          n++;
+          var lay = entryLayout(e);
+          if (y + lay.h > MAXY) newPage(headFn);
+          font("bold", 7.6, 20); txt(n + ".", C.num, y, "right");
+          drawLv(lay.det, C.det, y);
+          font("normal", 7.2, 20); lay.zone.forEach(function (z, i) { txt(z, C.zone, y + i * LH); });
+          amounts(e, y);
+          y += lay.h;
+        });
+        var sumNeed = 0.6 + (s.note ? 12.5 : 4) + (isLast ? 8.2 : 0);
+        if (y + sumNeed > (isLast ? LIMIT : MAXY)) newPage();
+        y += 0.6;
+        sumLine(s.sumLabel || ("Summe " + (s.title || "") + ":"), st.net, st.vat, st.gross, y);
+        if (s.note) {
+          y += 6.5; font("italic", 7.2, 20);
+          var nl = doc.splitTextToSize(pdfSafe(s.note), R - L - 6);
+          nl.forEach(function (l, i) { txt(l, L + 3, y + i * 3.2); });
+          y += 6 + (nl.length - 1) * 3.2;
+        } else y += isLast ? 4 : 9;
+      });
+      if (y + 8.2 > LIMIT) newPage();
+      doc.setDrawColor(215); doc.setLineWidth(0.2); doc.line(L, y, R, y);
+      y += 4.6;
+      sumLine(g.totalLabel || "Total:", gt.net, gt.vat, gt.gross, y);
+      y += 3.4; doc.line(L, y, R, y); boxSides(y);
+    });
+    y += 10;
+
+    // ---- Zusammenfassung ----
+    var lines = summaryLines(inv, T);
+    if (y + 20 + lines.length * 3.6 > MAXY) addPage();
+    band("Zusammenfassung", y);
+    var zTop = y + 7; y = zTop + 7;
+    font("normal", 8.2, 20);
+    lines.forEach(function (z, i) { txt(z.label, 42, y + i * 3.6); txt(eur(z.cents), R - 3, y + i * 3.6, "right"); });
+    y += Math.max(lines.length - 1, 0) * 3.6 + 8.5;
+    var pay = (inv.summary && inv.summary.payLabel) || "Total, payment via";
+    font("bold", 9, 20); txt(pay, 42, y);
+    if (!inv.summary || inv.summary.hasLogo || !inv.summary.payLabel) {
+      var px = 43 + lw(pay + " ");
+      doc.setLineDashPattern([1, 0.8], 0); doc.setDrawColor(150); doc.setLineWidth(0.25);
+      doc.rect(px, y - 4.3, 40, 6.2);
+      doc.setLineDashPattern([], 0); doc.setLineWidth(0.2);
+      font("normal", 6.5, 120); txt("Logo nicht enthalten", px + 20, y - 0.6, "center");
+    }
+    font("bold", 9, 20); txt(eur(T.gross), R - 3, y, "right");
+    y += 5;
+    doc.setDrawColor(215); doc.setLineWidth(0.2);
+    doc.line(L, zTop, L, y); doc.line(R, zTop, R, y); doc.line(L, y, R, y);
+    footer();
+    return doc;
+  }
+
+  return { parse: parse, totals: totals, summaryLines: summaryLines, buildPdf: buildPdf, eur: eur, rowsOf: rowsOf };
+})();
+
+(function () {
+  var NS = "easypark-editor:v1:";
+  var MONTHS_GEN = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+  var MONTHS_NOM = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+  var WD = ["вс","пн","вт","ср","чт","пт","сб"];
+  var SECTION_RU = { "Parkvorgänge": "Парковки", "EasyPark-Dienstleistung": "Абонплата и сборы EasyPark" };
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function rub(c) { return EP.eur(c).replace(/\./g, "\u202F") + "\u00A0€"; }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(NS + k); else localStorage.setItem(NS + k, JSON.stringify(v)); } catch (e) {} }
+  function load(k) { try { var r = localStorage.getItem(NS + k); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function parseDT(s) { var m = String(s).match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{1,2}):(\d{2})/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) : null; }
+  function hhmm(d) { return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+  function dur(a, b) { var min = Math.round((b - a) / 60000); if (min < 0) return ""; var h = Math.floor(min / 60), m = min % 60; return (h ? h + "\u00A0ч" + (m ? " " : "") : "") + (m || !h ? m + "\u00A0мин" : ""); }
+  function plural(n, one, few, many) { var a = n % 10, b = n % 100; if (a === 1 && b !== 11) return one; if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few; return many; }
+  function period(z) {
+    var m = String(z || "").match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/);
+    if (!m) return z ? "за " + z : "";
+    var last = new Date(+m[6], +m[5], 0).getDate();
+    if (+m[1] === 1 && m[2] === m[5] && m[3] === m[6] && +m[4] === last) return "за " + MONTHS_NOM[+m[2] - 1] + " " + m[3];
+    return "за " + m[1] + "." + m[2] + "." + m[3] + "\u202F–\u202F" + m[4] + "." + m[5] + "." + m[6];
+  }
+  function zoneField(e, re) { for (var i = 0; i < e.zone.length; i++) { var m = e.zone[i].match(re); if (m) return m[1].trim(); } return ""; }
+
+  var inv = null, removed = new Set(), nodes = {}, order = [], invKey = "";
+  var statusIsEmptyHint = false;
+
+  function setMsg(t, isErr) { var m = $("msg"); m.textContent = t || ""; m.className = "msg" + (isErr ? " err" : ""); }
+  function setStatus(t) { statusIsEmptyHint = /не осталось записей/.test(t); $("status").textContent = t; }
+
+  function extractPages(data) {
+    var lib = window.pdfjsLib;
+    try { lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; } catch (e) {}
+    return lib.getDocument({ data: data, isEvalSupported: false, disableFontFace: true, useSystemFonts: false, verbosity: 0 }).promise.then(function (doc) {
+      var pages = [], chain = Promise.resolve();
+      for (var p = 1; p <= doc.numPages; p++) (function (pn) {
+        chain = chain.then(function () { return doc.getPage(pn); }).then(function (page) {
+          var vp = page.getViewport({ scale: 1 });
+          return page.getTextContent().then(function (tc) {
+            pages.push({ W: vp.width, H: vp.height, items: tc.items.filter(function (i) { return typeof i.str === "string"; }).map(function (i) {
+              return { s: i.str, x: i.transform[4], y: vp.height - i.transform[5], w: i.width, size: Math.hypot(i.transform[2], i.transform[3]), font: i.fontName };
+            }) });
+          });
+        });
+      })(p);
+      return chain.then(function () { doc.destroy(); return pages; });
+    });
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name)) { showEmpty(); setMsg("Это не PDF. Выберите PDF-счёт EasyPark.", true); return; }
+    if (!window.pdfjsLib) { showEmpty(); setMsg("Библиотека для чтения PDF не загрузилась. Проверьте интернет и обновите страницу.", true); return; }
+    showEmpty(); setMsg("Читаю файл…");
+    file.arrayBuffer().then(function (buf) { return extractPages(new Uint8Array(buf)); }).then(function (pages) {
+      var textCount = pages.reduce(function (a, p) { return a + p.items.filter(function (i) { return i.s.trim(); }).length; }, 0);
+      if (!textCount) throw new Error("NO_TEXT");
+      openInvoice(EP.parse(pages));
+      setMsg("");
+    }).catch(function (e) {
+      var c = e && (e.message || e.name);
+      if (c === "NO_TEXT") setMsg("В этом PDF нет текста — похоже на скан или фото. Нужен исходный PDF-счёт из EasyPark.", true);
+      else if (c === "NOT_EASYPARK" || c === "NO_ENTRIES") setMsg("Не похоже на счёт EasyPark: в файле не нашлось раздела «Transaktionen» с записями.", true);
+      else if (e && e.name === "PasswordException") setMsg("Файл защищён паролем, открыть его не получится.", true);
+      else setMsg("Не удалось прочитать PDF: " + (c || "неизвестная ошибка"), true);
+    });
+  }
+
+  function showEmpty() {
+    $("empty").hidden = false; $("editor").hidden = true; $("bar").hidden = true; document.body.classList.remove("has-bar");
+  }
+  function openInvoice(data) {
+    inv = data;
+    invKey = inv.beleg || ("k" + inv.groups.map(function (g) { return g.sections.map(function (s) { return s.entries.map(function (e) { return e.key; }).join(","); }).join(";"); }).join("|").length);
+    var known = {}; allEntries().forEach(function (e) { known[e.key] = 1; });
+    var saved = load("removed:" + invKey);
+    if (!saved && inv.beleg) { try { var old = localStorage.getItem("easypark-" + inv.beleg + "-removed"); if (old) saved = JSON.parse(old); } catch (e) {} }
+    removed = new Set((saved || []).filter(function (k) { return known[k]; }));
+    store("last", inv);
+    render();
+  }
+  function allEntries() { var out = []; inv.groups.forEach(function (g) { g.sections.forEach(function (s) { out = out.concat(s.entries); }); }); return out; }
+
+  function render() {
+    $("empty").hidden = true; $("editor").hidden = false; $("bar").hidden = false; document.body.classList.add("has-bar");
+    $("title").textContent = "Счёт EasyPark " + period(inv.zeitraum);
+    var meta = $("meta"); meta.textContent = "";
+    function md(k, v) { if (!v) return; meta.appendChild(el("dt", null, k)); meta.appendChild(el("dd", "num", v)); }
+    md("Счёт №", (inv.beleg || "—") + (inv.datum ? " от " + inv.datum : ""));
+    md("Клиент", (inv.address[0] || "") + (inv.kunde ? ", № " + inv.kunde : ""));
+    md("Период", (inv.zeitraum || "").replace(/\s*-\s*/, "\u202F–\u202F"));
+    var w = $("warn"); w.textContent = "";
+    if (inv.warnings && inv.warnings.length) {
+      w.appendChild(el("strong", null, "Проверьте распознавание."));
+      w.appendChild(document.createTextNode(" Что-то в файле разобралось не так, как ожидалось:"));
+      var ul = el("ul"); inv.warnings.slice(0, 6).forEach(function (t) { ul.appendChild(el("li", null, t)); }); w.appendChild(ul);
+      w.hidden = false;
+    } else w.hidden = true;
+
+    var lists = $("lists"); lists.textContent = ""; nodes = {}; order = [];
+    var multi = inv.groups.length > 1;
+    inv.groups.forEach(function (g) {
+      if (multi && g.label) lists.appendChild(el("p", "grouphead", g.label));
+      g.sections.forEach(function (s) {
+        if (!s.entries.length) return;
+        var head = el("div", "sechead");
+        head.appendChild(el("h2", null, SECTION_RU[s.title] || s.title || "Записи"));
+        var cnt = el("span", "count num"); head.appendChild(cnt);
+        lists.appendChild(head);
+        var ol = el("ol", "list"); lists.appendChild(ol);
+        s.entries.forEach(function (e) { makeItem(e, ol, s, cnt); });
+      });
+    });
+    update();
+  }
+
+  function makeItem(e, list, sec, cnt) {
+    var li = el("li", "item"), pos = el("span", "pos num"), body = el("div", "body");
+    var s = parseDT(e.start), en = parseDT(e.end), label;
+    if (s && en) {
+      var dateTxt = s.getDate() + " " + MONTHS_GEN[s.getMonth()];
+      label = dateTxt + ", " + rub(e.gross);
+      var top = el("div", "top");
+      top.appendChild(el("span", "date", dateTxt)); top.appendChild(el("span", "wd", WD[s.getDay()]));
+      top.appendChild(el("span", "amt num", rub(e.gross)));
+      body.appendChild(top);
+      body.appendChild(el("div", "line2 num", hhmm(s) + "–" + hhmm(en) + (dur(s, en) ? ", " + dur(s, en) : "")));
+      var op = (e.zone[0] || "").replace(/^Bezirksamt\s+Berlin\s+/, "").replace(/^Bezirksamt\s+/, "");
+      var zone = zoneField(e, /^Parkzone:\s*(.*)$/), zname = zoneField(e, /^Name der Parkzone:\s*(.*)$/);
+      var place = op + (zone ? ", зона " + zone : "") + (zname && zname.replace(/\s/g, "") !== zone.replace(/\s/g, "") ? " (" + zname + ")" : "");
+      body.appendChild(el("div", "place", place));
+    } else {
+      var spec = e.zone[0] || (e.fields[0] ? e.fields[0][1] : "Запись");
+      var per = "", m = spec.match(/^(.*?)\s+(\d{2}\.\d{2}\.\d{4})\s*-\s*(\d{2}\.\d{2}\.\d{4})$/);
+      if (m) { spec = m[1]; per = "за " + m[2] + "\u202F–\u202F" + m[3]; }
+      spec = spec.replace(/^Grundgebühr\s*-\s*/, "Абонплата ");
+      label = spec + ", " + rub(e.gross);
+      var top2 = el("div", "top");
+      top2.appendChild(el("span", "date", spec)); top2.appendChild(el("span", "amt num", rub(e.gross)));
+      body.appendChild(top2);
+      if (per) body.appendChild(el("div", "line2 num", per));
+      e.zone.slice(1).forEach(function (z) { body.appendChild(el("div", "line2", z)); });
+      if (e.vat || e.pct) body.appendChild(el("div", "place num", rub(e.net) + " + НДС " + String(e.pct).replace(".", ",") + "\u00A0% " + rub(e.vat)));
+    }
+    var ids = el("div", "ids");
+    if (e.plate) {
+      var plate = el("span", "plate"); plate.setAttribute("aria-label", "Номер машины " + e.plate);
+      plate.appendChild(el("span", "eu", "D")); plate.appendChild(el("span", "pn", e.plate)); ids.appendChild(plate);
+    }
+    if (e.tid) ids.appendChild(el("span", "tid", e.tid));
+    if (ids.childNodes.length) body.appendChild(ids);
+    var btn = el("button", "act"); btn.type = "button";
+    btn.addEventListener("click", function () {
+      if (removed.has(e.key)) removed.delete(e.key); else removed.add(e.key);
+      store("removed:" + invKey, Array.from(removed)); update();
+    });
+    li.appendChild(pos); li.appendChild(body); li.appendChild(btn); list.appendChild(li);
+    nodes[e.key] = { li: li, pos: pos, btn: btn, label: label, sec: sec, cnt: cnt };
+    order.push(e.key);
+  }
+
+  function update() {
+    var n = 0, secCounts = new Map();
+    order.forEach(function (k) {
+      var nd = nodes[k], off = removed.has(k);
+      nd.li.classList.toggle("removed", off);
+      nd.pos.textContent = off ? "—" : String(++n);
+      nd.btn.textContent = off ? "Вернуть" : "✕";
+      nd.btn.setAttribute("aria-label", (off ? "Вернуть в счёт: " : "Убрать из счёта: ") + nd.label);
+      var c = secCounts.get(nd.cnt) || [0, 0]; c[1]++; if (!off) c[0]++; secCounts.set(nd.cnt, c);
+    });
+    secCounts.forEach(function (c, span) { span.textContent = c[0] + " из " + c[1] + " в счёте"; });
+
+    var T = EP.totals(inv, removed), full = EP.totals(inv, new Set());
+    var rows = $("srows"); rows.textContent = "";
+    function srow(l, v, cls) { var d = el("div", "srow" + (cls ? " " + cls : "")); d.appendChild(el("span", null, l)); d.appendChild(el("span", "num", v)); rows.appendChild(d); }
+    var bySec = {}, secOrder = [];
+    inv.groups.forEach(function (g, gi) {
+      g.sections.forEach(function (s, si) {
+        var t = s.title || "Записи";
+        if (!bySec[t]) { bySec[t] = { net: 0, gross: 0, vatted: false }; secOrder.push(t); }
+        if (s.entries.some(function (e) { return e.vat || e.pct; })) bySec[t].vatted = true;
+        var st = T.groups[gi].sections[si]; bySec[t].net += st.net; bySec[t].gross += st.gross;
+      });
+    });
+    secOrder.forEach(function (t) {
+      var b = bySec[t], ru = SECTION_RU[t] || t;
+      if (b.vatted) srow((t === "EasyPark-Dienstleistung" ? "Абонплата и сборы" : ru) + " без НДС", rub(b.net));
+      else srow(ru, rub(b.gross));
+    });
+    var rates = Object.keys(full.byRate).map(Number).sort(function (a, b) { return a - b; });
+    rates.forEach(function (r) { if (r > 0) srow("НДС " + String(r).replace(".", ",") + "\u00A0%", rub(T.byRate[r] || 0)); });
+    srow("Итого", rub(T.gross), "total");
+    $("bTotal").textContent = rub(T.gross);
+
+    var k = removed.size;
+    $("changes").hidden = k === 0;
+    if (k) $("changesText").textContent = "Убрано " + k + " " + plural(k, "запись", "записи", "записей") + " на " + rub(full.gross - T.gross) + ". В исходном счёте " + rub(full.gross) + ".";
+    $("dl").disabled = T.active === 0;
+    if (T.active === 0) setStatus("В счёте не осталось записей — верните хотя бы одну, чтобы скачать PDF.");
+    else if (statusIsEmptyHint) setStatus("");
+  }
+
+  // ---- events ----
+  $("file").addEventListener("change", function () { var f = this.files && this.files[0]; this.value = ""; handleFile(f); });
+  $("another").addEventListener("click", function () { $("file").click(); });
+  $("closeInv").addEventListener("click", function () { store("last", null); inv = null; setStatus(""); setMsg(""); showEmpty(); });
+  $("restoreAll").addEventListener("click", function () {
+    removed.clear(); store("removed:" + invKey, []); update();
+    if (order[0] && nodes[order[0]]) nodes[order[0]].btn.focus();
+  });
+  var drop = $("drop");
+  ["dragenter", "dragover"].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); if (!$("empty").hidden) drop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (t) { document.addEventListener(t, function (e) { if (t === "dragleave" && e.relatedTarget) return; drop.classList.remove("over"); }); });
+  document.addEventListener("drop", function (e) { e.preventDefault(); var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); });
+
+  var dlPromise = Promise.resolve(null);
+  try { if (window.claude && typeof window.claude.use === "function") dlPromise = window.claude.use("downloads").catch(function () { return null; }); } catch (e) {}
+  var busy = false;
+  $("dl").addEventListener("click", function () {
+    if (busy || !inv) return;
+    if (!window.jspdf || !window.jspdf.jsPDF) { setStatus("Библиотека для PDF не загрузилась. Проверьте интернет и обновите страницу."); return; }
+    busy = true; setStatus("Готовлю PDF…");
+    var filename = "EasyPark_Rechnung_" + (inv.beleg || "bearbeitet").replace(/[^\w.-]/g, "") + ".pdf";
+    var blob;
+    try { blob = EP.buildPdf(window.jspdf.jsPDF, inv, removed).output("blob"); }
+    catch (e) { busy = false; setStatus("Не получилось собрать PDF: " + (e && e.message ? e.message : "ошибка")); return; }
+    dlPromise.then(function (dl) {
+      if (dl) {
+        return dl.save({ filename: filename, data: blob }).then(function () { setStatus("PDF сохранён."); }, function (err) {
+          var c = err && err.code;
+          if (c === "declined") setStatus("Скачивание отменено.");
+          else if (c === "rate_limited") setStatus("Окно сохранения уже открыто или было много попыток. Подождите и нажмите снова.");
+          else setStatus("Скачивание здесь недоступно. Откройте страницу в приложении Claude или на claude.ai.");
+        });
+      }
+      var url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      setStatus(window.claude ? "Если файл не скачался, откройте страницу в приложении Claude или на claude.ai." : "PDF скачан.");
+    }).then(function () { busy = false; }, function () { busy = false; });
+  });
+
+  // ---- restore last invoice ----
+  var last = load("last");
+  if (last && last.groups) { try { openInvoice(last); } catch (e) { store("last", null); showEmpty(); } }
+  else showEmpty();
+})();
+</script>
+</body>
+</html>
